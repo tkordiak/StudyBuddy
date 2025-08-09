@@ -11,6 +11,7 @@ import { LoadingOverlay } from "@/components/dashboard/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { FileText } from "lucide-react";
 
 export interface GenerationState {
   company: string;
