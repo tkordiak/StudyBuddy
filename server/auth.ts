@@ -70,46 +70,15 @@ export function setupAuth(app: Express) {
   app.get("/auth/verify", async (req, res) => {
     try {
       const { token } = req.query;
+      console.log("Verifying token:", token);
 
       if (!token) {
         return res.redirect("/#/auth?error=missing-token");
       }
 
-      const magicLink = await storage.getMagicLinkByToken(token as string);
-
-      if (!magicLink) {
-        return res.redirect("/#/auth?error=invalid-token");
-      }
-
-      if (magicLink.used) {
-        return res.redirect("/#/auth?error=token-used");
-      }
-
-      if (new Date() > magicLink.expiresAt) {
-        return res.redirect("/#/auth?error=token-expired");
-      }
-
-      // Mark token as used
-      await storage.markMagicLinkUsed(token as string);
-
-      // Find or create user
-      let user = await storage.getUserByEmail(magicLink.email);
-      if (!user) {
-        user = await storage.createUser({ email: magicLink.email });
-      }
-
-      // Set user session and save it
-      req.session.userId = user.id;
-      
-      // Force session save before redirect
-      req.session.save((err) => {
-        if (err) {
-          console.error("Session save error:", err);
-          return res.redirect("/#/auth?error=session-failed");
-        }
-        // Redirect to dashboard after session is saved
-        res.redirect("/#/dashboard");
-      });
+      // Instead of processing here, redirect to auth page with token
+      // The frontend will handle the verification via POST API
+      res.redirect(`/#/auth?token=${encodeURIComponent(token as string)}`);
     } catch (error) {
       console.error("Magic link verification error:", error);
       res.redirect("/#/auth?error=verification-failed");

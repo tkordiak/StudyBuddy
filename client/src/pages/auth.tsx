@@ -21,13 +21,49 @@ export default function Auth() {
 
   // Check for magic link token in URL
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+    // Check for token in hash parameters (after #)
+    const hash = window.location.hash;
+    const hashParams = new URLSearchParams(hash.split('?')[1] || '');
+    const tokenFromHash = hashParams.get('token');
     
-    if (token) {
-      verifyMagicLinkMutation.mutate({ token });
+    // Check for token in regular URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token');
+    
+    // Check for error in hash parameters
+    const error = hashParams.get('error');
+    if (error) {
+      let errorMessage = 'Authentication failed';
+      switch(error) {
+        case 'token-used':
+          errorMessage = 'This magic link has already been used';
+          break;
+        case 'token-expired':
+          errorMessage = 'This magic link has expired';
+          break;
+        case 'invalid-token':
+          errorMessage = 'Invalid magic link';
+          break;
+      }
+      toast({
+        title: "Authentication Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      // Clear the error from URL
+      window.history.replaceState({}, '', '#/auth');
     }
-  }, [verifyMagicLinkMutation]);
+    
+    const token = tokenFromHash || tokenFromUrl;
+    if (token) {
+      verifyMagicLinkMutation.mutate({ token }, {
+        onSuccess: () => {
+          // Clear the token from URL after successful verification
+          window.history.replaceState({}, '', '#/auth');
+        }
+      });
+    }
+  }, [verifyMagicLinkMutation, toast]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
