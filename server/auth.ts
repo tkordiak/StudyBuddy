@@ -66,7 +66,50 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Magic link verification endpoint
+  // Magic link verification via GET (for email clicks)
+  app.get("/auth/verify", async (req, res) => {
+    try {
+      const { token } = req.query;
+
+      if (!token) {
+        return res.redirect("/auth?error=missing-token");
+      }
+
+      const magicLink = await storage.getMagicLinkByToken(token as string);
+
+      if (!magicLink) {
+        return res.redirect("/auth?error=invalid-token");
+      }
+
+      if (magicLink.used) {
+        return res.redirect("/auth?error=token-used");
+      }
+
+      if (new Date() > magicLink.expiresAt) {
+        return res.redirect("/auth?error=token-expired");
+      }
+
+      // Mark token as used
+      await storage.markMagicLinkUsed(token as string);
+
+      // Find or create user
+      let user = await storage.getUserByEmail(magicLink.email);
+      if (!user) {
+        user = await storage.createUser({ email: magicLink.email });
+      }
+
+      // Set user session
+      req.session.userId = user.id;
+
+      // Redirect to dashboard
+      res.redirect("/dashboard");
+    } catch (error) {
+      console.error("Magic link verification error:", error);
+      res.redirect("/auth?error=verification-failed");
+    }
+  });
+
+  // Magic link verification endpoint (for API calls)
   app.post("/api/auth/verify-magic-link", async (req, res) => {
     try {
       const { token } = req.body;
