@@ -9,6 +9,7 @@ The application features a modern React frontend with TypeScript, a Node.js/Expr
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Language: Polish (user communicates in Polish)
 
 ## System Architecture
 
