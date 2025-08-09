@@ -72,21 +72,21 @@ export function setupAuth(app: Express) {
       const { token } = req.query;
 
       if (!token) {
-        return res.redirect("/auth?error=missing-token");
+        return res.redirect("/#/auth?error=missing-token");
       }
 
       const magicLink = await storage.getMagicLinkByToken(token as string);
 
       if (!magicLink) {
-        return res.redirect("/auth?error=invalid-token");
+        return res.redirect("/#/auth?error=invalid-token");
       }
 
       if (magicLink.used) {
-        return res.redirect("/auth?error=token-used");
+        return res.redirect("/#/auth?error=token-used");
       }
 
       if (new Date() > magicLink.expiresAt) {
-        return res.redirect("/auth?error=token-expired");
+        return res.redirect("/#/auth?error=token-expired");
       }
 
       // Mark token as used
@@ -98,14 +98,21 @@ export function setupAuth(app: Express) {
         user = await storage.createUser({ email: magicLink.email });
       }
 
-      // Set user session
+      // Set user session and save it
       req.session.userId = user.id;
-
-      // Redirect to dashboard
-      res.redirect("/dashboard");
+      
+      // Force session save before redirect
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.redirect("/#/auth?error=session-failed");
+        }
+        // Redirect to dashboard after session is saved
+        res.redirect("/#/dashboard");
+      });
     } catch (error) {
       console.error("Magic link verification error:", error);
-      res.redirect("/auth?error=verification-failed");
+      res.redirect("/#/auth?error=verification-failed");
     }
   });
 
