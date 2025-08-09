@@ -27,7 +27,7 @@ export function setupAuth(app: Express) {
     store: storage.sessionStore,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false, // Set to false for Replit development
       sameSite: "lax",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     },
@@ -76,9 +76,44 @@ export function setupAuth(app: Express) {
         return res.redirect("/#/auth?error=missing-token");
       }
 
-      // Instead of processing here, redirect to auth page with token
-      // The frontend will handle the verification via POST API
-      res.redirect(`/#/auth?token=${encodeURIComponent(token as string)}`);
+      const magicLink = await storage.getMagicLinkByToken(token as string);
+      console.log("Found magic link:", magicLink);
+
+      if (!magicLink) {
+        return res.redirect("/#/auth?error=invalid-token");
+      }
+
+      if (magicLink.used) {
+        return res.redirect("/#/auth?error=token-used");
+      }
+
+      if (new Date() > magicLink.expiresAt) {
+        return res.redirect("/#/auth?error=token-expired");
+      }
+
+      // Mark token as used
+      await storage.markMagicLinkUsed(token as string);
+
+      // Find or create user
+      let user = await storage.getUserByEmail(magicLink.email);
+      if (!user) {
+        user = await storage.createUser({ email: magicLink.email });
+      }
+      console.log("User authenticated:", user.id);
+
+      // Set user session and save it
+      req.session.userId = user.id;
+      
+      // Force session save before redirect
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.redirect("/#/auth?error=session-failed");
+        }
+        console.log("Session saved, redirecting to dashboard");
+        // Redirect to dashboard after session is saved
+        res.redirect("/#/dashboard");
+      });
     } catch (error) {
       console.error("Magic link verification error:", error);
       res.redirect("/#/auth?error=verification-failed");
