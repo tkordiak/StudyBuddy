@@ -11,7 +11,9 @@ const transporter = nodemailer.createTransport({
 });
 
 export async function sendMagicLinkEmail(email: string, token: string) {
-  const baseUrl = process.env.BASE_URL || "http://localhost:5000";
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : process.env.BASE_URL || "http://localhost:5000";
   const magicLink = `${baseUrl}/auth/verify?token=${token}`;
 
   const mailOptions = {
