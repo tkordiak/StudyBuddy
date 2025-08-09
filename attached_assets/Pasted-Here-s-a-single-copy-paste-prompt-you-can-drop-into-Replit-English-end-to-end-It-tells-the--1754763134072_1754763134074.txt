@@ -1,0 +1,239 @@
+Here’s a **single, copy-paste prompt** you can drop into Replit (English, end-to-end). It tells the AI exactly what to build.
+
+---
+
+**Build me a production-ready full-stack web app on Replit called “TailoredApply” — an AI Resume & Cover Letter Generator for Specific Companies.**
+
+### 0) High-level
+
+* **Goal:** User enters *target role* + *company*, pastes their resume (or uploads PDF), and gets:
+
+  1. A **tailored resume** (one-page) aligned to the job & company culture.
+  2. A **custom cover letter** referencing the company’s values, products, and tone.
+* **Time-to-MVP:** 5–7 days. Keep scope tight, code clean, and ship something users can try immediately.
+
+### 1) Tech stack (keep it simple)
+
+* **Frontend:** React + Vite + TypeScript + TailwindCSS. Form validation with Zod + react-hook-form. File upload (PDF/DOCX) using a simple uploader.
+* **Backend:** Node.js (TypeScript) + Express. Use OpenAI-compatible API (I’ll supply keys). Use a light vector store (SQLite via better-sqlite3) for caching prompts/results per user.
+* **Auth:** Passwordless email magic links (Magic or passwordless via OTP email). If too long, stub simple email+code flow with JWT.
+* **DB:** SQLite (via Prisma). Tables: `users`, `generations`, `uploads`.
+* **Payments:** Stripe Checkout (one-time credits + subscription). Keep it minimal but functional.
+* **Deployment:** Replit web server + environment variables.
+* **Testing:** Vitest (frontend), Jest (backend) for core utilities/prompt builders.
+
+### 2) Core user flow (Happy path)
+
+1. **Landing page** → “Generate resume & cover letter tailored to *{Company}* for *{Role}*”.
+2. **Auth** → email magic link or OTP; persist `userId` in JWT cookie (HTTP-only, Secure, SameSite=Lax).
+3. **Dashboard**:
+
+   * Step A: Enter **Company** + **Role/Job Title** + (optional) **Job description URL**.
+   * Step B: Paste **resume text** or upload **PDF/DOCX**; extract plaintext using `pdf-parse` or `docx` parser. Show parsed text in an editable textarea.
+   * Step C: “Generate” → call backend `/api/generate`.
+4. **Results**: Show two tabs:
+
+   * **Tailored Resume**: ATS-friendly, one page, bullet-heavy, quantifiable, keywords from JD.
+   * **Cover Letter**: 250–400 words, strong opening, 1–2 quantified achievements, a nod to company values/products, CTA.
+5. **Export**: Download **.docx** and **.pdf**; copy as **Markdown** and **plain text**.
+6. **History**: List previous generations with timestamps; allow re-generate with tweaks.
+
+### 3) Pages (minimal)
+
+* `/` Landing (hero, how it works, sample output)
+* `/login` (email → code → verify)
+* `/dashboard` (main flow)
+* `/history`
+* `/billing` (Stripe integration)
+* `/privacy`, `/terms`, `/support`
+
+### 4) Data model (Prisma)
+
+```prisma
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  createdAt    DateTime @default(now())
+  credits      Int      @default(10)
+  plan         String   @default("free") // free | pro
+  generations  Generation[]
+}
+
+model Generation {
+  id           String   @id @default(cuid())
+  userId       String
+  createdAt    DateTime @default(now())
+  company      String
+  role         String
+  jobUrl       String?
+  resumeInput  String   // normalized text
+  jdExtract    String?  // scraped JD if available
+  tailoredResumeMd String
+  coverLetterMd    String
+  tokensUsed    Int     @default(0)
+  User         User     @relation(fields: [userId], references: [id])
+}
+
+model Upload {
+  id        String   @id @default(cuid())
+  userId    String
+  filename  String
+  text      String
+  createdAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id])
+}
+```
+
+### 5) Backend API (Express, TypeScript)
+
+* `POST /api/auth/request-code` → send OTP to email (log to console in dev).
+* `POST /api/auth/verify-code` → set JWT cookie.
+* `POST /api/uploads` → upload file, extract text, return cleaned text.
+* `POST /api/generate` → body: `{ company, role, jobUrl?, resumeText }`
+
+  * If `jobUrl` present, **scrape** main content server-side with `got` + `node-html-parser` (handle CORS/timeouts gracefully).
+  * Build **prompt** (see §7) → call LLM (gpt-4o-mini or cheaper instruct) to produce:
+
+    * `tailoredResumeMd`
+    * `coverLetterMd`
+  * Save record, decrement credits (or check subscription).
+* `GET /api/history` → list last 20 generations.
+* `GET /api/generation/:id` → fetch one.
+* `POST /api/checkout/session` → Stripe Checkout session (credits or subscription).
+
+**Rate limiting:** per IP & per user via simple in-memory + DB fallback (e.g., 10 generate/hour on free).
+
+### 6) Frontend components
+
+* **Landing**: Hero + CTA, sample outputs (hardcoded examples).
+* **CompanyRoleForm**: react-hook-form + Zod schema:
+
+  * `company: string(min 2)`, `role: string(min 2)`, optional `jobUrl: url`.
+* **ResumeInput**: Toggle *Paste text* / *Upload*; show cleaned text.
+* **GenerateButton**: disabled when invalid; show spinner; optimistic UI.
+* **ResultTabs**: Markdown preview (use `react-markdown`).
+* **ExportBar**: Buttons: Copy, Download DOCX, Download PDF.
+* **HistoryList**: simple table.
+* **Billing**: show plan, credits, purchase buttons.
+
+### 7) Prompting strategy (crisp + consistent)
+
+**System prompt (backend constant):**
+
+```
+You are a precise career writing assistant that creates ATS-friendly, quantified,
+company-specific materials. Output clean Markdown without code fences.
+Never invent employment dates or employers; use provided resume only.
+If data is missing, ask for it briefly in a single line at the top, prefixed with "MISSING:".
+```
+
+**User prompt template (backend):**
+
+```
+Task: Generate two artifacts: (1) a one-page ATS-friendly resume, (2) a 250–400 word cover letter.
+Target Role: {role}
+Company: {company}
+Company Info (from job URL if provided, else "N/A"):
+{jdExtract}
+
+Candidate Resume (normalized text):
+{resumeText}
+
+Constraints:
+- Resume: one page, strong section order: Summary, Skills (keywords from JD), Experience (bulleted, quantified),
+  Education, Certifications (if any). Avoid tables; use short, dense bullets (max 1–2 lines each).
+- Tailor language to the company's known products, markets, and tone. Include relevant keywords explicitly.
+- Cover letter: 3–5 paragraphs, mention 1–2 specific company facts from JD or known public info in jdExtract,
+  connect 2–3 quantified achievements, end with a clear CTA.
+- Output exactly two headings: "## Tailored Resume" and "## Cover Letter" with content beneath each.
+```
+
+**Post-processing:** Split the Markdown into two fields by headings.
+
+### 8) Quality rules
+
+* **ATS-friendly**: plain text/Markdown only, no images/tables. Use standard section headings.
+* **Quantification**: Enforce numbers (“reduced costs by 17%”, “handled 120+ tickets/week”).
+* **Company alignment**: Pull 3–8 keywords from JD (store in `jdExtractKeywords` if you want).
+* **Guardrails**: If `resumeText` is under 400 chars, return `MISSING:` line prompting user for more data.
+
+### 9) File generation
+
+* **DOCX**: Use `docx` npm to convert Markdown to structured docx (simple style).
+* **PDF**: Generate server-side from HTML via `puppeteer` or `pdf-lib`.
+* Keep exports lightweight and fast.
+
+### 10) Stripe plans (minimal)
+
+* **Free:** 10 credits on signup, 1 credit per generation.
+* **Credits pack:** €9 → +20 credits.
+* **Pro subscription:** €12/month → 100 credits/month, priority queue.
+  Implement webhooks minimally (`checkout.session.completed`) to set `plan` or increment credits.
+
+### 11) Basic scraping (optional but useful)
+
+* If `jobUrl` provided, attempt fetch and extract:
+
+  * Job title, responsibilities bullets, requirements bullets, any “About the company” paragraph.
+  * Fallback silently if blocked; never crash generation.
+
+### 12) Security & privacy
+
+* Store only necessary data. Allow **Delete My Data** in Settings.
+* Set HTTP-only, Secure cookies; CSRF token for POST forms.
+* Validate inputs with Zod on client & server. Sanitize HTML; escape Markdown.
+* Log errors with minimal PII.
+
+### 13) Tests
+
+* **Backend unit tests** for:
+
+  * prompt builder (given inputs → prompt includes key sections)
+  * resume cleaner (upload parsing)
+  * rate limiter
+* **Frontend tests** for:
+
+  * form validation
+  * result renderer splitting sections
+* Add one **integration test** mocking LLM response.
+
+### 14) Developer ergonomics
+
+* Provide `README.md` with:
+
+  * setup, env vars, run scripts
+  * how to swap between OpenAI / other compatible endpoints
+  * how to toggle Stripe test mode
+* Seed script: create a demo user and 2 sample generations.
+
+### 15) Environment variables to wire
+
+```
+JWT_SECRET=...
+OPENAI_API_KEY=...
+STRIPE_SECRET_KEY=...
+STRIPE_PRICE_CREDITS=price_...
+STRIPE_PRICE_PRO=price_...
+EMAIL_FROM=noreply@tailoredapply.app
+SMTP_HOST=...
+SMTP_USER=...
+SMTP_PASS=...
+```
+
+### 16) Nice-to-haves (if time allows)
+
+* **Company presets**: dropdown with FAANG + big startups that autoload a style guide (tone keywords).
+* **Multi-language UI**: start EN, leave i18n hooks.
+* **Team mode** later (share generations).
+
+### 17) Done criteria (MVP)
+
+* User can log in, input company+role, paste/upload resume, press Generate, and receive:
+
+  * A tailored resume (Markdown preview + DOCX/PDF download)
+  * A cover letter (Markdown preview + DOCX/PDF download)
+* History works. Free credits decrement. Stripe test checkout adds credits.
+* Resilient error handling and basic rate limits.
+
+**Please scaffold the full project with this structure, implement all core flows, and ship a working MVP on Replit.**
+Where trade-offs are needed, prioritize: **speed → reliability → clean code → extra features** (in that order).
