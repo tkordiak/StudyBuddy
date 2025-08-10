@@ -11,9 +11,13 @@ const transporter = nodemailer.createTransport({
 });
 
 export async function sendMagicLinkEmail(email: string, token: string) {
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : process.env.BASE_URL || "http://localhost:5000";
+  // Hardcode the deployment URL from the screenshot
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? "https://eedcf2cf-ae7f-4cc2-a1e3-11d0382043b5-00-2lmdaxpnhc42z.kirk.replit.dev"
+    : process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : "http://localhost:5000";
+      
   const magicLink = `${baseUrl}/auth/verify?token=${token}`;
 
   const mailOptions = {
