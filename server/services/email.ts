@@ -11,11 +11,12 @@ const transporter = nodemailer.createTransport({
 });
 
 export async function sendMagicLinkEmail(email: string, token: string) {
-  // Use DEPLOYMENT_URL environment variable if available
-  const baseUrl = process.env.DEPLOYMENT_URL 
-    || (process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : "http://localhost:5000");
+  // Use the correct deployment URL for production
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? "https://study-buddy-TomaszKordiak.replit.app"
+    : process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : "http://localhost:5000";
       
   const magicLink = `${baseUrl}/auth/verify?token=${token}`;
   

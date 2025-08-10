@@ -13,12 +13,13 @@ Language: Polish (user communicates in Polish)
 
 ## Recent Changes
 
-### Authentication System - January 9, 2025
+### Authentication System - January 10, 2025
 - Successfully implemented magic link authentication system
 - Fixed session management for Replit environment  
 - Email integration with SMTP working
 - User can now access full application functionality
-- Application fully deployed and accessible via public Replit URL
+- Application deployed at: https://study-buddy-TomaszKordiak.replit.app
+- Fixed deployment URL configuration for magic link emails
 
 ## System Architecture
 
