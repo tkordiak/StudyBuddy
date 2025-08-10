@@ -22,8 +22,8 @@ export async function parseFile(buffer: Buffer, filename: string): Promise<strin
 
 async function parsePdfFile(buffer: Buffer): Promise<string> {
   try {
-    // Dynamically import pdf-parse to avoid module loading issues
-    const pdfParse = (await import('pdf-parse')).default;
+    // Use require instead of dynamic import to avoid module loading issues
+    const pdfParse = require('pdf-parse');
     
     // Validate buffer
     if (!buffer || buffer.length === 0) {
@@ -38,6 +38,7 @@ async function parsePdfFile(buffer: Buffer): Promise<string> {
       throw new Error('No text content found in PDF');
     }
     
+    console.log(`Successfully extracted ${data.text.length} characters from PDF`);
     return cleanText(data.text);
   } catch (error) {
     console.error('PDF parsing error:', error);
