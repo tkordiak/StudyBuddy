@@ -15,11 +15,11 @@ export async function generateDocx(content: string, title: string): Promise<Buff
     if (!trimmed) {
       if (currentList.length > 0) {
         // Add list items
-        currentList.forEach(item => {
-          paragraphs.push(new Paragraph({
-            children: [new TextRun({ text: item, bullet: { level: 0 } })],
-          }));
-        });
+          currentList.forEach(item => {
+            paragraphs.push(
+              new Paragraph({ text: item, bullet: { level: 0 } }),
+            );
+          });
         currentList = [];
       }
       paragraphs.push(new Paragraph({ children: [new TextRun("")] }));
@@ -70,9 +70,9 @@ export async function generateDocx(content: string, title: string): Promise<Buff
   // Add remaining list items
   if (currentList.length > 0) {
     currentList.forEach(item => {
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text: item, bullet: { level: 0 } })],
-      }));
+      paragraphs.push(
+        new Paragraph({ text: item, bullet: { level: 0 } }),
+      );
     });
   }
 
