@@ -21,10 +21,28 @@ export async function parseFile(buffer: Buffer, filename: string): Promise<strin
 }
 
 async function parsePdfFile(buffer: Buffer): Promise<string> {
-  // Dynamically import pdf-parse to avoid module loading issues
-  const pdfParse = (await import('pdf-parse')).default;
-  const data = await pdfParse(buffer);
-  return cleanText(data.text);
+  try {
+    // Dynamically import pdf-parse to avoid module loading issues
+    const pdfParse = (await import('pdf-parse')).default;
+    
+    // Validate buffer
+    if (!buffer || buffer.length === 0) {
+      throw new Error('Invalid PDF buffer received');
+    }
+    
+    console.log(`Parsing PDF buffer of size: ${buffer.length} bytes`);
+    
+    const data = await pdfParse(buffer);
+    
+    if (!data.text || data.text.trim().length === 0) {
+      throw new Error('No text content found in PDF');
+    }
+    
+    return cleanText(data.text);
+  } catch (error) {
+    console.error('PDF parsing error:', error);
+    throw new Error(`PDF parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 async function parseDocxFile(buffer: Buffer): Promise<string> {

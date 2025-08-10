@@ -45,6 +45,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
+      console.log(`Processing file: ${req.file.originalname}, size: ${req.file.size} bytes, type: ${req.file.mimetype}`);
+      
       const text = await parseFile(req.file.buffer, req.file.originalname);
       const validation = validateResumeContent(text);
 
