@@ -1,4 +1,5 @@
 import mammoth from 'mammoth';
+import pdfParse from 'pdf-parse';
 
 export async function parseFile(buffer: Buffer, filename: string): Promise<string> {
   const ext = filename.toLowerCase().split('.').pop();
@@ -22,9 +23,6 @@ export async function parseFile(buffer: Buffer, filename: string): Promise<strin
 
 async function parsePdfFile(buffer: Buffer): Promise<string> {
   try {
-    // Use require instead of dynamic import to avoid module loading issues
-    const pdfParse = require('pdf-parse');
-    
     // Validate buffer
     if (!buffer || buffer.length === 0) {
       throw new Error('Invalid PDF buffer received');
