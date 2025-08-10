@@ -49,7 +49,7 @@ export default function Dashboard() {
   const handleGenerate = async () => {
     if (!user) return;
     
-    if (user.credits < 1) {
+    if ((user.credits ?? 0) < 1) {
       toast({
         title: "Insufficient credits",
         description: "You need at least 1 credit to generate materials. Please purchase more credits.",

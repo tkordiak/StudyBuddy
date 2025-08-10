@@ -92,6 +92,9 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const newGeneration: Generation = {
       ...generation,
+      jobUrl: generation.jobUrl ?? null,
+      jdExtract: generation.jdExtract ?? null,
+      tokensUsed: generation.tokensUsed ?? null,
       id,
       createdAt: new Date(),
     };
